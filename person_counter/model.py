@@ -22,23 +22,29 @@ from person_counter.trackers.multi_tracker_zoo import create_tracker
 import cv2
 
 class PersonCounterModel(opencv_stream.Model):
-   def __init__(self) -> None:
-        yolo_weights=WEIGHTS / 'yolov5s.pt'
-        dnn=False # use OpenCV DNN for ONNX inference
+   def __init__(self,
+                device='',
+                dnn=False,
+                yolo_weights=WEIGHTS / 'yolov5s.pt',
+                half=False,
+                conf_thres=0.25, 
+                iou_thres=0.45,
+                max_det=1000,
+                tracking_method='strongsort',
+                reid_weights=WEIGHTS / 'osnet_x0_25_msmt17.pt',
+                imgsz=(640, 640)
+                ) -> None:
         # model = Model()
-        device = ''
-        self.device = select_device(device)
-        self.half=False  # use FP16 half-precision inference
+        self.half = half
+        self.device = select_device(device)  # use FP16 half-precision inference
         self.model = DetectMultiBackend(yolo_weights, device=self.device, dnn=dnn, data=None, fp16=self.half)
         self.augment=False  # augmented inference
-        self.conf_thres=0.25
-        self.iou_thres=0.45
+        self.conf_thres=conf_thres
+        self.iou_thres=iou_thres
         self.classes = 0
         self.agnostic_nms=False  # class-agnostic NMS
-        self.max_det=1000
+        self.max_det=max_det
         self.tracker_list = []
-        tracking_method='strongsort'
-        reid_weights=WEIGHTS / 'osnet_x0_25_msmt17.pt'
         nr_sources = 1
         for i in range(nr_sources):
             tracker = create_tracker(tracking_method, reid_weights, self.device, self.half)
@@ -50,7 +56,6 @@ class PersonCounterModel(opencv_stream.Model):
 
         self.prev_frames: Optional[np.ndarray] = None  
         self.stride = self.model.stride
-        imgsz=(640, 640)
         self.img_size = check_img_size(imgsz, s=self.stride)
         self.auto = True
 
