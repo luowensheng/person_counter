@@ -8,7 +8,7 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(cwd, "README.md"), encoding="utf-8") as f:
     long_description = "\n" + f.read()
 
-VERSION = '1.1.18'
+VERSION = '1.1.19'
 DESCRIPTION = 'Person Counter using torch'
 install_requires = [r for r in open(os.path.join(cwd, "person_counter", "requirements.txt")).read().splitlines() ]
 
