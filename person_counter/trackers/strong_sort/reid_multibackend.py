@@ -32,8 +32,12 @@ class ReIDDetectMultiBackend(nn.Module):
     # ReID models MultiBackend class for python inference on various backends
     def __init__(self, weights='osnet_x0_25_msmt17.pt', device=torch.device('cpu'), fp16=False):
         super().__init__()
+        import os
+        from ...utils.utils import download_to_weights_folder
 
         w = weights[0] if isinstance(weights, list) else weights
+        if isinstance(w, str):
+            w = Path(w)
         self.pt, self.jit, self.onnx, self.xml, self.engine, self.coreml, self.saved_model, \
             self.pb, self.tflite, self.edgetpu, self.tfjs, self.paddle = self.model_type(w)  # get backend
         self.fp16 = fp16
@@ -56,7 +60,12 @@ class ReIDDetectMultiBackend(nn.Module):
         if w.suffix == '.pt':
             model_url = get_model_url(w)
             if not file_exists(w) and model_url is not None:
-                gdown.download(model_url, str(w), quiet=False)
+                download_to_weights_folder(
+                        w.parent.as_posix(),
+                        model_url,
+                        w.as_posix()
+                    )
+
             elif file_exists(w):
                 pass
             else:
@@ -80,24 +89,24 @@ class ReIDDetectMultiBackend(nn.Module):
             self.model.to(device).eval()
             self.model.half() if self.fp16 else  self.model.float()
         elif self.jit:
-            LOGGER.info(f'Loading {w} for TorchScript inference...')
+            print(f'Loading {w} for TorchScript inference...')
             self.model = torch.jit.load(w)
             self.model.half() if self.fp16 else self.model.float()
         elif self.onnx:  # ONNX Runtime
-            LOGGER.info(f'Loading {w} for ONNX Runtime inference...')
+            print(f'Loading {w} for ONNX Runtime inference...')
             cuda = torch.cuda.is_available() and device.type != 'cpu'
             #check_requirements(('onnx', 'onnxruntime-gpu' if cuda else 'onnxruntime'))
             import onnxruntime
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
             self.session = onnxruntime.InferenceSession(str(w), providers=providers)
         elif self.engine:  # TensorRT
-            LOGGER.info(f'Loading {w} for TensorRT inference...')
+            print(f'Loading {w} for TensorRT inference...')
             import tensorrt as trt  # https://developer.nvidia.com/nvidia-tensorrt-download
             check_version(trt.__version__, '7.0.0', hard=True)  # require tensorrt>=7.0.0
             if device.type == 'cpu':
                 device = torch.device('cuda:0')
             Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
-            logger = trt.Logger(trt.Logger.INFO)
+            logger = trt.Logger(trt.print)
             with open(w, 'rb') as f, trt.Runtime(logger) as runtime:
                 self.model_ = runtime.deserialize_cuda_engine(f.read())
             self.context = self.model_.create_execution_context()
@@ -119,7 +128,7 @@ class ReIDDetectMultiBackend(nn.Module):
             self.binding_addrs = OrderedDict((n, d.ptr) for n, d in self.bindings.items())
             batch_size = self.bindings['images'].shape[0]  # if dynamic, this is instead max batch size
         elif self.xml:  # OpenVINO
-            LOGGER.info(f'Loading {w} for OpenVINO inference...')
+            print(f'Loading {w} for OpenVINO inference...')
             check_requirements(('openvino',))  # requires openvino-dev: https://pypi.org/project/openvino-dev/
             from openvino.runtime import Core, Layout, get_batch
             ie = Core()
@@ -135,7 +144,7 @@ class ReIDDetectMultiBackend(nn.Module):
             self.output_layer = next(iter(self.executable_network.outputs))
         
         elif self.tflite:
-            LOGGER.info(f'Loading {w} for TensorFlow Lite inference...')
+            print(f'Loading {w} for TensorFlow Lite inference...')
             try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
                 from tflite_runtime.interpreter import Interpreter, load_delegate
             except ImportError:
@@ -163,7 +172,7 @@ class ReIDDetectMultiBackend(nn.Module):
     @staticmethod
     def model_type(p='path/to/model.pt'):
         # Return model type from model path, i.e. path='path/to/model.onnx' -> type=onnx
-        from export import export_formats
+        from ...yolov5.export import export_formats
         sf = list(export_formats().Suffix)  # export suffixes
         check_suffix(p, sf)  # checks
         types = [s in Path(p).name for s in sf]

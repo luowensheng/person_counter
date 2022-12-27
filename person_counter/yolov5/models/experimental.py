@@ -164,5 +164,38 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
     assert all(model[0].nc == m.nc for m in model), f'Models have different class counts: {[m.nc for m in model]}'
     return model
 
+def load_from_weigths(weight_path:str, device=None, inplace=True, fuse=True):
+    # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
+    from ..models.yolo import DetectionModel, Model, Detect
+    from .configs import yolov5s_yaml
+
+    model = Ensemble()
+    m = DetectionModel(config_str=yolov5s_yaml).to(device)
+    m.load_state_dict(torch.load(weight_path))
+    m = m.fuse().eval() if fuse and hasattr(m, 'fuse') else m.eval()
+    model.append(m)
+
+    # Module compatibility updates
+    for m in model.modules():
+        t = type(m)
+        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Model):
+            m.inplace = inplace  # torch 1.7.0 compatibility
+            if t is Detect and not isinstance(m.anchor_grid, list):
+                delattr(m, 'anchor_grid')
+                setattr(m, 'anchor_grid', [torch.zeros(1)] * m.nl)
+        elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
+            m.recompute_scale_factor = None  # torch 1.11.0 compatibility
+
+    # Return model
+    if len(model) == 1:
+        return model[-1]
+
+    # Return detection ensemble
+    print(f'Ensemble created with \n')
+    for k in 'names', 'nc', 'yaml':
+        setattr(model, k, getattr(model[0], k))
+    model.stride = model[torch.argmax(torch.tensor([m.stride.max() for m in model])).int()].stride  # max stride
+    assert all(model[0].nc == m.nc for m in model), f'Models have different class counts: {[m.nc for m in model]}'
+    return model
 
 attempt_download, attempt_load 

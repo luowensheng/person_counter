@@ -25,7 +25,7 @@ class PersonCounterModel(opencv_stream.Model):
    def __init__(self,
                 device='',
                 dnn=False,
-                yolo_weights=WEIGHTS / 'yolov5s.pt',
+                yolo_weights=WEIGHTS / 'yolov5s_weights.pt',
                 half=False,
                 conf_thres=0.25, 
                 iou_thres=0.45,
@@ -37,6 +37,8 @@ class PersonCounterModel(opencv_stream.Model):
         # model = Model()
         self.half = half
         self.device = select_device(device)  # use FP16 half-precision inference
+        if not isinstance(yolo_weights, str):
+           yolo_weights = yolo_weights.as_posix()
         self.model = DetectMultiBackend(yolo_weights, device=self.device, dnn=dnn, data=None, fp16=self.half)
         self.augment=False  # augmented inference
         self.conf_thres=conf_thres
@@ -46,6 +48,8 @@ class PersonCounterModel(opencv_stream.Model):
         self.max_det=max_det
         self.tracker_list = []
         nr_sources = 1
+        if isinstance(reid_weights, str):
+            reid_weights = Path(reid_weights)
         for i in range(nr_sources):
             tracker = create_tracker(tracking_method, reid_weights, self.device, self.half)
             self.tracker_list.append(tracker, )

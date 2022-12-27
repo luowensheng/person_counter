@@ -24,6 +24,10 @@ class YamlParser(edict):
         with open(config_file, 'r') as fo:
             yaml_ = yaml.load(fo.read(), Loader=yaml.FullLoader)
             self.update(yaml_)
+            
+    def merge_from_string(self, config_str):
+            yaml_ = yaml.safe_load(config_str)
+            self.update(yaml_)    
 
     def merge_from_dict(self, config_dict):
         self.update(config_dict)

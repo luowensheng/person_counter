@@ -171,15 +171,19 @@ class BaseModel(nn.Module):
 
 class DetectionModel(BaseModel):
     # YOLOv5 detection model
-    def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None):  # model, input channels, number of classes
+    def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None,config_str:str=None):  # model, input channels, number of classes
         super().__init__()
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
         else:  # is *.yaml
             import yaml  # for torch hub
-            self.yaml_file = Path(cfg).name
-            with open(cfg, encoding='ascii', errors='ignore') as f:
-                self.yaml = yaml.safe_load(f)  # model dict
+            if config_str is None:
+                self.yaml_file = Path(cfg).name
+                with open(cfg, encoding='ascii', errors='ignore') as f:
+                    self.yaml = yaml.safe_load(f)  # model dict
+            else:
+                self.yaml = yaml.safe_load(config_str)  # model dict
+
 
         # Define model
         ch = self.yaml['ch'] = self.yaml.get('ch', ch)  # input channels
