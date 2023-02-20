@@ -7,7 +7,7 @@ from person_counter.model import PersonCounterModel, PersonCounterOutput
 import numpy as np
 import os
 
-VIDEO_DIR = "D:/project/facebodydetection/facebodydetect/app/src/videos"
+VIDEO_DIR = "./videos"
 def get_video():
    paths = [ os.path.join(VIDEO_DIR, p) for p in os.listdir(VIDEO_DIR)]
    return np.random.choice(paths)
